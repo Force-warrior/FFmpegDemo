@@ -50,7 +50,7 @@ void MainWindow::on_btn_start_clicked(){
 
     initparam.in_video_width = 320;
     initparam.in_video_height = 240;
-#if 1
+#if 0
     initparam.in_capture_type = CAPTURE_DEVICE;
     strcpy(initparam.in_path_file_name_, cur_dev_video.toLocal8Bit());
 #else

@@ -51,6 +51,7 @@ FORMS += \
     mainwindow.ui
 
 include($$PWD/FFmpegWrapper/ffmpeg_wrapper.pri)
+include($$PWD/Util/Util.pri)
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

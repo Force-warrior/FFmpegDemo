@@ -130,8 +130,16 @@ public:
 
     void funcThreadCapture(){
         AVPacket *packet_ = av_packet_alloc();
-        AVFrame *frame_ = av_frame_alloc();
+        AVFrame *pframe_ = av_frame_alloc();
+        AVFrame *poutframe_ = av_frame_alloc();
         int result = -1;
+
+        //设置帧数据转换上下文
+        struct SwsContext *img_convert_ctx = nullptr;
+        img_convert_ctx = sws_getContext(mCodecCtx_->width, mCodecCtx_->height, mCodecCtx_->pix_fmt,
+                                         mCodecCtx_->width, mCodecCtx_->height, AV_PIX_FMT_YUV420P,
+                                         SWS_BILINEAR, NULL, NULL, NULL);
+
         while(!isCaptureThreadExit){
             if(av_read_frame(mFormatCtx_, packet_) < 0){
                 std::this_thread::sleep_for(std::chrono::milliseconds(20));
@@ -142,11 +150,41 @@ public:
                     av_packet_unref(packet_);
                     continue;
                 }
-                result = avcodec_receive_frame(mCodecCtx_, frame_);
+                result = avcodec_receive_frame(mCodecCtx_, pframe_);
                 if(result < 0 && result != AVERROR_EOF){
                     av_packet_unref(packet_);
                     continue;
                 }
+
+                int ret = sws_scale(img_convert_ctx, pframe_->data, pframe_->linesize,
+                          0, mCodecCtx_->height, poutframe_->data, poutframe_->linesize);
+                if(!poutframe_){
+                    av_packet_unref(packet_);
+                    continue;
+                }
+
+                FILE * file = NULL;
+                file = fopen("d:\\picture.yuv", "ab+");
+                unsigned char *py = (unsigned char*)pframe_->data[0];
+                unsigned char *pu = (unsigned char*)pframe_->data[1];
+                unsigned char *pv = (unsigned char*)pframe_->data[2];
+                for (int i = 0; i < pframe_->height; i++)
+                {
+                    fwrite(py, pframe_->width, 1, file);
+                    py += pframe_->linesize[0];
+                }
+                for (int i = 0; i < pframe_->height / 2; i++)
+                {
+                    fwrite(pu, pframe_->width / 2, 1, file);
+                    pu += pframe_->linesize[1];
+                }
+                for (int i = 0; i < pframe_->height / 2; i++)
+                {
+                    fwrite(pv, pframe_->width / 2, 1, file);
+                    pv += pframe_->linesize[2];
+                }
+                fclose(file);
+
             }
             av_packet_unref(packet_);
         }
