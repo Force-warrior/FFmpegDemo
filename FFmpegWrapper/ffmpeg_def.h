@@ -20,13 +20,15 @@ extern "C" {
 enum Capture_Tye{
     CAPTURE_DEVICE,
     CAPTURE_SCREEN,
+    CAPTURE_FILE,
 };
 
 struct InitParam{
-    char path_file_name_[256];  // 全路径文件名（utf-8）
-    Capture_Tye type;
-    int video_width;
-    int video_height;
+    Capture_Tye in_capture_type;
+    char in_path_file_name_[256]={0};  // 全路径文件名（utf-8）
+    int in_video_width;
+    int in_video_height;
+
 };
 
 #endif // FFMPEG_DEF_H

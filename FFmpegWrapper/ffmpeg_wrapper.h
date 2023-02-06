@@ -2,6 +2,7 @@
 #define FFMPEGWRAPPER_H
 #include <string.h>
 #include <stdio.h>
+#include <memory>
 
 #include "ffmpeg_def.h"
 using namespace std;
@@ -18,8 +19,8 @@ public:
     bool stop();
 
 private:
-    bool init_;
-    InitParam init_param_;
+    class Impl;
+    std::shared_ptr<Impl> impl_;
 };
 
 #endif // FFMPEGWRAPPER_H

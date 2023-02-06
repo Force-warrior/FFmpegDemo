@@ -20,8 +20,7 @@ CONFIG(debug, debug|release) {
     OBJECTS_DIR = $$PWD/tmp/debug/objects
     RCC_DIR = $$PWD/tmp/debug/resources
 
-    win32:DESTDIR = $$PWD/bin/debug/
-    macx:DESTDIR = $$PWD/bin
+    DESTDIR = $$shell_path($$PWD/bin/debug)
 } else {
     DEFINES -= _DEBUG
     DEFINES -= DEBUG
@@ -38,8 +37,7 @@ CONFIG(debug, debug|release) {
     QMAKE_OBJECTIVE_CFLAGS_RELEASE = $$QMAKE_OBJECTIVE_CFLAGS_RELEASE_WITH_DEBUGINFO
     QMAKE_LFLAGS_RELEASE = $$QMAKE_LFLAGS_RELEASE_WITH_DEBUGINFO
 
-    win32:DESTDIR = $$PWD/bin/release/
-    macx:DESTDIR = $$PWD/bin
+    DESTDIR = $$shell_path($$PWD/bin/release)
 }
 
 SOURCES += \
