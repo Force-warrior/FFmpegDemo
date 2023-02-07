@@ -5,6 +5,8 @@
 #include <memory>
 
 #include "ffmpeg_def.h"
+#include "IFFmpegDelegate.h"
+
 using namespace std;
 
 class FFmpegWrapper
@@ -15,8 +17,10 @@ public:
 public:
     bool Init(InitParam& param);
     void unInit();
-    bool start();
-    bool stop();
+    bool startCapture();
+    bool stopCapture();
+    void addOutPut(VideoCaptureOutPut* output);
+    void delOutPut(VideoCaptureOutPut* output);
 
 private:
     class Impl;

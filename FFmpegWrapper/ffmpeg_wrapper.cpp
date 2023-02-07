@@ -1,7 +1,24 @@
 #include "ffmpeg_wrapper.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include "libavutil/samplefmt.h"
+#include "libavutil/timestamp.h"
+#include "libavcodec/avcodec.h"
+#include "libavformat/avformat.h"
+#include "libswresample/swresample.h"
+#include "libswscale/swscale.h"
+
+#include "libavdevice/avdevice.h"
+#ifdef __cplusplus
+}
+#endif
+
 #include <thread>
 #include <memory>
+#include <mutex>
 
 #include <QDebug>
 
@@ -9,6 +26,15 @@ static inline char* err2str(int eno){
     static char buf[1024];
     return av_make_error_string(buf, size_t(sizeof(buf)), eno);
 }
+struct MatchAVPIX{
+    PIXEL_FORMAT iformat;
+    AVPixelFormat avformat;
+};
+static MatchAVPIX AV_PIX_FMT[]={
+            {FMT_RGBA, AV_PIX_FMT_RGBA},
+            {FMT_BGRA, AV_PIX_FMT_BGRA},
+            {FMT_I420,AV_PIX_FMT_YUV420P},
+            {FMT_NV12,AV_PIX_FMT_NV12}};
 
 class FFmpegWrapper::Impl: public enable_shared_from_this<Impl>{
 public:
@@ -17,9 +43,19 @@ public:
         }
         const std::shared_ptr<Impl> thiz_;
     };
+
+    struct OutputContext{
+        VideoCaptureOutPut* handler;
+        struct SwsContext *convert;
+    };
+
 public:
     Impl()
-        :isinit_(false){
+        :isinit_(false),
+        isCaptureThreadExit(false),
+        mOutputAVFrame(nullptr),
+        mCodecCtx_(nullptr),
+        mFormatCtx_(nullptr){
 
     }
     ~Impl(){
@@ -38,9 +74,26 @@ public:
     void unInit(){
         isinit_ = false;
         isCaptureThreadExit = false;
+        release();
     }
 
-    bool start(){
+    void release(){
+        if(mOutputAVFrame){
+            av_frame_free(&mOutputAVFrame);
+            mOutputAVFrame = nullptr;
+        }
+
+        if(mCodecCtx_){
+            avcodec_free_context(&mCodecCtx_);
+        }
+
+        if(mFormatCtx_){
+            avformat_close_input(&mFormatCtx_);
+            avformat_free_context(mFormatCtx_);
+        }
+    }
+
+    bool startCapture(){
         do{
             //创建设备上下文
             if(nullptr == (mFormatCtx_ = avformat_alloc_context())){
@@ -105,26 +158,31 @@ public:
             }
             isCaptureThreadExit = false;
 
-            CaptureThreadData *data = new CaptureThreadData(this->shared_from_this());
-            std::thread([](void* data){
-                CaptureThreadData *data_ = (CaptureThreadData*)data;
-                data_->thiz_->funcThreadCapture();
-                delete data;
-            }, data).detach();
+            {
+                CaptureThreadData *data = new CaptureThreadData(this->shared_from_this());
+                std::thread([](void* data){
+                    CaptureThreadData *data_ = (CaptureThreadData*)data;
+                    data_->thiz_->funcThreadCapture();
+                    delete data;
+                }, data).detach();
+            }
+
+            {
+                CaptureThreadData *data = new CaptureThreadData(this->shared_from_this());
+                std::thread([](void* data){
+                    CaptureThreadData *data_ = (CaptureThreadData*)data;
+                    data_->thiz_->captureOutputFunc();
+                    delete data;
+                }, data).detach();
+            }
+
             return true;
         }while(false);
-        if(mCodecCtx_){
-            avcodec_free_context(&mCodecCtx_);
-        }
-
-        if(mFormatCtx_){
-            avformat_close_input(&mFormatCtx_);
-            avformat_free_context(mFormatCtx_);
-        }
+        release();
         return false;
     }
 
-    bool stop(){
+    bool stopCapture(){
         return true;
     }
 
@@ -136,8 +194,8 @@ public:
 
         //设置帧数据转换上下文
         struct SwsContext *img_convert_ctx = nullptr;
-        img_convert_ctx = sws_getContext(mCodecCtx_->width, mCodecCtx_->height, mCodecCtx_->pix_fmt,
-                                         mCodecCtx_->width, mCodecCtx_->height, AV_PIX_FMT_YUV420P,
+        img_convert_ctx = sws_getContext(mCodecCtx_->width, mCodecCtx_->height, AV_PIX_FMT_YUV420P,
+                                         320, 240, AV_PIX_FMT_YUV420P,
                                          SWS_BILINEAR, NULL, NULL, NULL);
 
         while(!isCaptureThreadExit){
@@ -156,37 +214,117 @@ public:
                     continue;
                 }
 
-                int ret = sws_scale(img_convert_ctx, pframe_->data, pframe_->linesize,
-                          0, mCodecCtx_->height, poutframe_->data, poutframe_->linesize);
+
+                {
+                    std::lock_guard<std::mutex> g_lock(mOutputAVFrameMutex);
+                    if(mOutputAVFrame)
+                        av_frame_free(&mOutputAVFrame);
+                    mOutputAVFrame = av_frame_clone(pframe_);
+                }
+
                 if(!poutframe_){
                     av_packet_unref(packet_);
                     continue;
                 }
-
-                FILE * file = NULL;
-                file = fopen("d:\\picture.yuv", "ab+");
-                unsigned char *py = (unsigned char*)pframe_->data[0];
-                unsigned char *pu = (unsigned char*)pframe_->data[1];
-                unsigned char *pv = (unsigned char*)pframe_->data[2];
-                for (int i = 0; i < pframe_->height; i++)
-                {
-                    fwrite(py, pframe_->width, 1, file);
-                    py += pframe_->linesize[0];
-                }
-                for (int i = 0; i < pframe_->height / 2; i++)
-                {
-                    fwrite(pu, pframe_->width / 2, 1, file);
-                    pu += pframe_->linesize[1];
-                }
-                for (int i = 0; i < pframe_->height / 2; i++)
-                {
-                    fwrite(pv, pframe_->width / 2, 1, file);
-                    pv += pframe_->linesize[2];
-                }
-                fclose(file);
-
             }
             av_packet_unref(packet_);
+        }
+
+        if(pframe_){
+            av_frame_free(&pframe_);
+            pframe_ = nullptr;
+        }
+        release();
+    }
+
+    void captureOutputFunc(){
+        while(!isCaptureThreadExit){
+            AVFrame* tempframe = nullptr;
+            {
+                std::lock_guard<std::mutex> g_lock(mOutputAVFrameMutex);
+                if(!mOutputAVFrame)
+                    continue;
+                tempframe = av_frame_clone(mOutputAVFrame);
+                av_frame_free(&mOutputAVFrame);
+                mOutputAVFrame = nullptr;
+            }
+            if(!tempframe)
+                continue;
+            outputVideoFrame(tempframe);
+
+            av_frame_free(&tempframe);
+            tempframe = nullptr;
+        }
+    }
+    void outputVideoFrame(AVFrame* frame){
+        std::lock_guard<std::mutex> g_lock(mOutputContextMutex);
+        for(auto iter = vec_output.begin(); iter != vec_output.end(); iter++){
+            AVFrame *frameYUV = nullptr;
+            if((frame->width == iter->handler->width) &&
+               (frame->height == iter->handler->height) &&
+               (AV_PIX_FMT[iter->handler->type].avformat == frame->format)){
+                frameYUV = frame;
+            }
+            else{
+                if(nullptr == iter->convert){
+                    iter->convert = sws_getContext(frame->width, frame->height, AV_PIX_FMT[iter->handler->type].avformat, iter->handler->width, iter->handler->height, AV_PIX_FMT_YUV420P, SWS_BILINEAR, NULL, NULL, NULL);
+                    if (!iter->convert) {
+                        continue;
+                    }
+                }
+                if (frameYUV == nullptr) {
+                    frameYUV = av_frame_alloc();
+                    if (!frameYUV)
+                        continue;
+
+                    frameYUV->format = AV_PIX_FMT[iter->handler->type].avformat;
+                    frameYUV->width = iter->handler->width;
+                    frameYUV->height = iter->handler->height;
+
+                    /* allocate the buffers for the frame data */
+                    int ret = av_frame_get_buffer(frameYUV, 32);
+                    if (ret < 0) {
+                        av_frame_free(&frameYUV);
+                        frameYUV = nullptr;
+                        continue;
+                    }
+                }
+
+                // convert pix_fmt only
+                int ret = sws_scale(iter->convert, (const unsigned char* const*)frame->data, frame->linesize, 0, frame->height, frameYUV->data, frameYUV->linesize);
+            }
+            VideoFrame outputvideoframe;
+            outputvideoframe.data[0] = frameYUV->data[0];
+            outputvideoframe.data[1] = frameYUV->data[1];
+            outputvideoframe.data[2] = frameYUV->data[2];
+            outputvideoframe.linesize[0] = frameYUV->linesize[0];
+            outputvideoframe.linesize[1] = frameYUV->linesize[1];
+            outputvideoframe.linesize[2] = frameYUV->linesize[2];
+
+            outputvideoframe.width = frameYUV->width;
+            outputvideoframe.height = frameYUV->height;
+            outputvideoframe.pts = frameYUV->pts;
+            //outputvideoframe.framerate = frameYUV->;
+            iter->handler->eventhandler->onCaptureVideoFrame(outputvideoframe);
+        }
+    }
+    void addOutPut(VideoCaptureOutPut* output){
+        std::lock_guard<std::mutex> g_lock(mOutputContextMutex);
+        OutputContext oc;
+        oc.handler = output;
+        oc.convert = nullptr;
+        vec_output.push_back(oc);
+    }
+
+    void delOutPut(VideoCaptureOutPut* output){
+        std::lock_guard<std::mutex> g_lock(mOutputContextMutex);
+        for(auto iter = vec_output.begin(); iter != vec_output.end(); iter++){
+            if(iter->handler == output){
+                if(iter->convert)
+                    sws_freeContext(iter->convert);
+                vec_output.erase(iter++);
+                return;
+            }
         }
     }
 
@@ -196,7 +334,11 @@ private:
     InitParam init_param_;
     AVFormatContext *mFormatCtx_ = nullptr;
     AVCodecContext *mCodecCtx_ = nullptr;
+    AVFrame *mOutputAVFrame = nullptr;
     int nVideoIndex = -1;
+    std::mutex mOutputAVFrameMutex;
+    std::mutex mOutputContextMutex;
+    std::vector<OutputContext> vec_output;
 };
 
 
@@ -217,10 +359,18 @@ void FFmpegWrapper::unInit(){
     return impl_->unInit();
 }
 
-bool FFmpegWrapper::start(){
-    return impl_->start();
+bool FFmpegWrapper::startCapture(){
+    return impl_->startCapture();
 }
 
-bool FFmpegWrapper::stop(){
-    return impl_->stop();
+bool FFmpegWrapper::stopCapture(){
+    return impl_->stopCapture();
+}
+
+void FFmpegWrapper::addOutPut(VideoCaptureOutPut* output){
+    return impl_->addOutPut(output);
+}
+
+void FFmpegWrapper::delOutPut(VideoCaptureOutPut* output){
+    return impl_->delOutPut(output);
 }

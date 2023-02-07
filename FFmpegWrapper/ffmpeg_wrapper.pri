@@ -1,12 +1,15 @@
 
 HEADERS += \
-    $$PWD/ffmpeg_def.h \
-    $$PWD/ffmpeg_wrapper.h
+    $$PWD/IFFmpegDelegate.h \
+    $$PWD/ffmpeg_wrapper.h \
+    $$PWD/ffmpeg_def.h
 
 SOURCES += \
     $$PWD/ffmpeg_wrapper.cpp
 
-INCLUDEPATH += $$PWD
+INCLUDEPATH += \
+    $$PWD \
+
 
 win32:{
     INCLUDEPATH += \
