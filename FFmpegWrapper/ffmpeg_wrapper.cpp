@@ -267,7 +267,7 @@ public:
             }
             else{
                 if(nullptr == iter->convert){
-                    iter->convert = sws_getContext(frame->width, frame->height, AV_PIX_FMT[iter->handler->type].avformat, iter->handler->width, iter->handler->height, AV_PIX_FMT_YUV420P, SWS_BILINEAR, NULL, NULL, NULL);
+                    iter->convert = sws_getContext(frame->width, frame->height, mCodecCtx_->pix_fmt, iter->handler->width, iter->handler->height, AV_PIX_FMT_YUV420P, SWS_BILINEAR, NULL, NULL, NULL);
                     if (!iter->convert) {
                         continue;
                     }
@@ -291,7 +291,7 @@ public:
                 }
 
                 // convert pix_fmt only
-                int ret = sws_scale(iter->convert, (const unsigned char* const*)frame->data, frame->linesize, 0, frame->height, frameYUV->data, frameYUV->linesize);
+                int ret = sws_scale(iter->convert, (const unsigned char* const*)frame->data, frame->linesize, 0, mCodecCtx_->height, frameYUV->data, frameYUV->linesize);
             }
             VideoFrame outputvideoframe;
             outputvideoframe.data[0] = frameYUV->data[0];
