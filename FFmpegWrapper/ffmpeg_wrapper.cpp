@@ -116,9 +116,9 @@ public:
             av_dict_set(&options, "video_size", resolution, 0);
             av_dict_set(&options, "rw_timeout", "3000", 0);
 
-            qDebug()<<"open "<<init_param_.in_path_file_name_<<endl;
-            if (avformat_open_input(&mFormatCtx_, init_param_.in_path_file_name_, iformat, &options) < 0) {
-                qDebug()<<"open camera "<<init_param_.in_path_file_name_<<"failed"<<endl;
+            qDebug()<<"open "<<init_param_.in_dev_or_url_<<endl;
+            if (avformat_open_input(&mFormatCtx_, init_param_.in_dev_or_url_, iformat, &options) < 0) {
+                qDebug()<<"open camera "<<init_param_.in_dev_or_url_<<"failed"<<endl;
                 break;
             }
 
@@ -260,14 +260,14 @@ public:
         std::lock_guard<std::mutex> g_lock(mOutputContextMutex);
         for(auto iter = vec_output.begin(); iter != vec_output.end(); iter++){
             AVFrame *frameYUV = nullptr;
-            if((frame->width == iter->handler->width) &&
-               (frame->height == iter->handler->height) &&
-               (AV_PIX_FMT[iter->handler->type].avformat == frame->format)){
+            if((frame->width == init_param_.in_video_width) &&
+               (frame->height == init_param_.in_video_height) &&
+               (AV_PIX_FMT[init_param_.in_pixel_fmt].avformat == frame->format)){
                 frameYUV = frame;
             }
             else{
                 if(nullptr == iter->convert){
-                    iter->convert = sws_getContext(frame->width, frame->height, mCodecCtx_->pix_fmt, iter->handler->width, iter->handler->height, AV_PIX_FMT_YUV420P, SWS_BILINEAR, NULL, NULL, NULL);
+                    iter->convert = sws_getContext(frame->width, frame->height, mCodecCtx_->pix_fmt, init_param_.in_video_width, init_param_.in_video_height, AV_PIX_FMT[init_param_.in_pixel_fmt].avformat, SWS_BILINEAR, NULL, NULL, NULL);
                     if (!iter->convert) {
                         continue;
                     }
@@ -277,9 +277,9 @@ public:
                     if (!frameYUV)
                         continue;
 
-                    frameYUV->format = AV_PIX_FMT[iter->handler->type].avformat;
-                    frameYUV->width = iter->handler->width;
-                    frameYUV->height = iter->handler->height;
+                    frameYUV->format = AV_PIX_FMT[init_param_.in_pixel_fmt].avformat;
+                    frameYUV->width = init_param_.in_video_width;
+                    frameYUV->height = init_param_.in_video_height;
 
                     /* allocate the buffers for the frame data */
                     int ret = av_frame_get_buffer(frameYUV, 32);
@@ -294,6 +294,7 @@ public:
                 int ret = sws_scale(iter->convert, (const unsigned char* const*)frame->data, frame->linesize, 0, mCodecCtx_->height, frameYUV->data, frameYUV->linesize);
             }
             VideoFrame outputvideoframe;
+            outputvideoframe.fmt = init_param_.in_pixel_fmt;
             outputvideoframe.data[0] = frameYUV->data[0];
             outputvideoframe.data[1] = frameYUV->data[1];
             outputvideoframe.data[2] = frameYUV->data[2];

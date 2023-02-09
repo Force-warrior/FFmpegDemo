@@ -9,11 +9,21 @@ enum Capture_Tye{
     CAPTURE_FILE,
 };
 
+enum PIXEL_FORMAT {
+    FMT_RGBA = 0,
+    FMT_BGRA = 1,
+    FMT_I420 = 2,
+    FMT_NV12 = 3,
+    FMT_MJPGFILE = 4 // take snapshot video picture only
+};
+
 struct InitParam{
     Capture_Tye in_capture_type;
-    char in_path_file_name_[256]={0};  // 全路径文件名（utf-8）
-    int in_video_width;
-    int in_video_height;
+    PIXEL_FORMAT in_pixel_fmt;  //only support I420 now
+    char in_dev_or_url_[256]={0};  // 全路径文件名（utf-8）
+    int32_t in_video_width = 0;
+    int32_t in_video_height = 0;
+    int32_t framerate = 0;
 
 };
 
@@ -22,14 +32,6 @@ enum PLANE_TYPE {
     U_PLANE = 1,
     V_PLANE = 2,
     NUM_OF_PLANES = 3
-};
-
-enum PIXEL_FORMAT {
-    FMT_RGBA = 0,
-    FMT_BGRA = 1,
-    FMT_I420 = 2,
-    FMT_NV12 = 3,
-    FMT_MJPGFILE = 4 // take snapshot video picture only
 };
 
 struct VideoFrame{
