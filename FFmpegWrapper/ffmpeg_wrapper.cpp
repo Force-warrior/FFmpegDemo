@@ -192,12 +192,6 @@ public:
         AVFrame *poutframe_ = av_frame_alloc();
         int result = -1;
 
-        //设置帧数据转换上下文
-        struct SwsContext *img_convert_ctx = nullptr;
-        img_convert_ctx = sws_getContext(mCodecCtx_->width, mCodecCtx_->height, AV_PIX_FMT_YUV420P,
-                                         320, 240, AV_PIX_FMT_YUV420P,
-                                         SWS_BILINEAR, NULL, NULL, NULL);
-
         while(!isCaptureThreadExit){
             if(av_read_frame(mFormatCtx_, packet_) < 0){
                 std::this_thread::sleep_for(std::chrono::milliseconds(20));

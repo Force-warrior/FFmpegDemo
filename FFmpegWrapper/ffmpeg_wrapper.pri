@@ -1,14 +1,27 @@
 
 HEADERS += \
     $$PWD/IFFmpegDelegate.h \
+    $$PWD/VideoCodec/decoder/DecWithFFmpegH264.h \
+    $$PWD/VideoCodec/decoder/DecWithFFmpegSoft.h \
+    $$PWD/VideoCodec/encoder/EncoderWithFFmpeg.h \
+    $$PWD/VideoEncImpl.h \
     $$PWD/ffmpeg_wrapper.h \
-    $$PWD/ffmpeg_def.h
+    $$PWD/ffmpeg_def.h \
+    $$PWD/VideoCodec/IVideoCodec.h \
+    $$PWD/VideoCodec/decoder/VideoDecBase.h \
+    $$PWD/VideoCodec/encoder/VideoEncBase.h \
 
 SOURCES += \
-    $$PWD/ffmpeg_wrapper.cpp
+    $$PWD/VideoCodec/decoder/DecWithFFmpegH264.cpp \
+    $$PWD/VideoCodec/decoder/DecWithFFmpegSoft.cpp \
+    $$PWD/VideoCodec/encoder/EncoderWithFFmpeg.cpp \
+    $$PWD/ffmpeg_wrapper.cpp \
+    $$PWD/VideoCodec/encoder/VideoEncBase.cpp \
+    $$PWD/VideoCodec/decoder/VideoDecBase.cpp \
 
 INCLUDEPATH += \
     $$PWD \
+    $$PWD/VideoCodec \
 
 
 win32:{

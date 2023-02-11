@@ -44,4 +44,20 @@ struct VideoFrame{
     int32_t framerate = 0;
 };
 
+enum CODEC_TYPE {
+    CODEC_TYPE_H264, // auto select, using hardware encoder first, else useing software encoder
+    CODEC_TYPE_H264_SOFT, // use software encoder
+    CODEC_TYPE_H265,
+    CODEC_TYPE_H265_SOFT,
+    CODEC_TYPE_H264_SOFT_WZ // use wzh264 software encoder
+};
+
+struct EncConfig {
+    CODEC_TYPE codecType;
+};
+
+struct DecConfig {
+    CODEC_TYPE codecType;
+};
+
 #endif // FFMPEG_DEF_H
